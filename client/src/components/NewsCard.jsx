@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -7,8 +7,12 @@ import {
   Typography,
   Popover,
 } from '@mui/material';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
 import TrendIcon from './TrendIcon';
 import SummaryButton from './SummaryButton';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import useTypewriterEffect from '../hooks/useTypewriterEffect';
+import { cleanSummary } from '../utils/helpers';
 
 function timeAgo(dateString) {
   const now = new Date();
@@ -22,6 +26,12 @@ function timeAgo(dateString) {
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 }
+
+const medalColors = [
+  '#FFD700', // Gold
+  '#C0C0C0', // Silver
+  '#cd7f32', // Bronze
+];
 
 function NewsCard({
   item,
@@ -39,10 +49,24 @@ function NewsCard({
   onMouseEnter,
   onMouseLeave,
   onClick,
-  typedText,
+  isImportant,
+  importantRank,
 }) {
   const key = `${item.title}_${colIdx}_${rowIdx}`;
   const isHovered = openTooltip === key;
+
+  // Local typewriter effect for popover
+  const [localTypedText, setLocalTypedText] = useState('');
+  useEffect(() => {
+    if (isHovered && aiScore?.interpretation) {
+      setLocalTypedText('');
+    }
+  }, [isHovered, aiScore?.interpretation]);
+  useTypewriterEffect(
+    isHovered ? aiScore?.interpretation : '',
+    !isHovered,
+    setLocalTypedText
+  );
 
   return (
     <Card
@@ -66,10 +90,29 @@ function NewsCard({
       onMouseLeave={onMouseLeave}
       onClick={onClick}
     >
+      {isImportant && importantRank && importantRank <= 3 && (
+        <Box sx={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          zIndex: 3,
+          width: 28,
+          height: 28,
+          bgcolor: medalColors[importantRank - 1],
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: 2,
+          border: '2px solid #fff',
+        }}>
+          <EmojiEventsIcon sx={{ color: '#fff', fontSize: 18 }} />
+        </Box>
+      )}
       <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, p: 1, pb: '8px !important', height: '100%' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.4 }}>
           <Avatar src={item.sourceIcon} alt={item.source} sx={{ width: 20, height: 20, mr: 1 }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', height: 20 }}>
             {item.source}
           </Typography>
         </Box>
@@ -94,35 +137,31 @@ function NewsCard({
             lineHeight: 1.2,
             minHeight: '2.4em',
             maxHeight: '2.4em',
-            mb: 0.2
+            mb: 1.2
           }}
         >
           {item.title}
         </Typography>
-        <Box sx={{ flexGrow: 1 }} />
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
             {timeAgo(item.isoDate)}
           </Typography>
-          <Box sx={{
-            position: 'absolute',
-            bottom: 8,
-            right: 8,
-            zIndex: 2,
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <TrendIcon sentiment={sentiment?.sentiment} loading={sentiment?.loading} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {showPriceImpact && isHovered && (
+              <SummaryButton
+                ref={priceImpactRef}
+                loading={aiScore?.loading}
+                interpretation={aiScore?.interpretation}
+                onClick={onClick}
+                isOpen={openTooltip === key}
+                sx={{ mb: 1 }}
+                sentiment={sentiment?.sentiment}
+              />
+            )}
+            <Box sx={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center' }}>
+              <TrendIcon sentiment={sentiment?.sentiment} loading={sentiment?.loading} />
+            </Box>
           </Box>
-          {showPriceImpact && isHovered && (
-            <SummaryButton
-              ref={priceImpactRef}
-              loading={aiScore?.loading}
-              interpretation={aiScore?.interpretation}
-              onClick={onClick}
-              isOpen={openTooltip === key}
-            />
-          )}
         </Box>
       </CardContent>
       <Popover
@@ -139,8 +178,8 @@ function NewsCard({
         }}
         PaperProps={{
           sx: {
-            width: cardWidth ? `${cardWidth}px` : '300px',
-            maxWidth: cardWidth ? `${cardWidth}px` : '300px',
+            width: cardWidth ? `${Math.round(cardWidth * 1.2)}px` : '360px',
+            maxWidth: cardWidth ? `${Math.round(cardWidth * 1.2)}px` : '360px',
             borderRadius: 2,
             bgcolor: 'background.paper',
             p: 2,
@@ -150,24 +189,43 @@ function NewsCard({
         }}
         disableRestoreFocus
       >
-        <Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'primary.main' }}>
-            AI Interpretation
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              whiteSpace: 'pre-line',
-              fontSize: '0.95rem',
-              maxHeight: '200px',
-              overflowY: 'auto',
-              fontFamily: 'monospace',
-              letterSpacing: '0.01em',
-            }}
-          >
-            {typedText || ''}
-          </Typography>
-        </Box>
+        <ClickAwayListener onClickAway={onClose}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', mr: 1 }}>
+                AI Interpretation
+              </Typography>
+              <TrendIcon sentiment={sentiment?.sentiment} loading={sentiment?.loading} />
+            </Box>
+            <Typography
+              variant="body2"
+              sx={{
+                whiteSpace: 'pre-line',
+                fontSize: '0.95rem',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                letterSpacing: '0.01em',
+                '&::-webkit-scrollbar': {
+                  width: '6px',
+                  backgroundColor: 'rgba(0,0,0,0.04)',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: 'rgba(120,120,120,0.25)',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  backgroundColor: 'rgba(120,120,120,0.45)',
+                },
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(120,120,120,0.25) rgba(0,0,0,0.04)',
+              }}
+            >
+              {cleanSummary(localTypedText || aiScore?.interpretation || 'NO AI RESPONSE')}
+            </Typography>
+          </Box>
+        </ClickAwayListener>
       </Popover>
     </Card>
   );

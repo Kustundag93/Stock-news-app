@@ -14,9 +14,11 @@ app.use(morgan('dev'));
 // Routes
 const newsRoutes = require('./routes/newsRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const companyRoutes = require('./routes/company');
 
 app.use('/api/news', newsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/company', companyRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

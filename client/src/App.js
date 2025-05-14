@@ -1,65 +1,63 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Container, Box, Typography } from '@mui/material';
-import { getNews } from './services/api';
+import React, { useRef, useState } from 'react';
+import { Box } from '@mui/material';
 import SearchBar from './components/SearchBar';
 import NewsGrid from './components/NewsGrid';
-import useSequentialFetch from './hooks/useSequentialFetch';
-import useSequentialSentimentFetch from './hooks/useSequentialSentimentFetch';
-import useTypewriterEffect from './hooks/useTypewriterEffect';
+import SentimentFilterBar from './components/SentimentFilterBar';
+import useSentimentFilter from './hooks/useSentimentFilter';
+import useAISummaries from './hooks/useAISummaries';
+import useAISentiments from './hooks/useAISentiments';
+import { normalize } from './utils/helpers';
+import useAppState from './hooks/useAppState';
+import useAppHandlers from './hooks/useAppHandlers';
+import CompanyDescriptionPanel from './components/CompanyDescriptionPanel';
 
 function App() {
-  const [input, setInput] = useState('');
-  const [chips, setChips] = useState([]);
-  const [activeTab, setActiveTab] = useState(null);
-  const [news, setNews] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [aiScores, setAiScores] = useState({});
-  const [sentiments, setSentiments] = useState({});
-  const [anchorEls, setAnchorEls] = useState({});
-  const [openTooltip, setOpenTooltip] = useState(null);
-  const [showPriceImpact, setShowPriceImpact] = useState(true);
-  const [cardWidths, setCardWidths] = useState({});
+  const {
+    input,
+    setInput,
+    chips,
+    setChips,
+    activeTab,
+    setActiveTab,
+    news,
+    loading,
+    aiScores,
+    setAiScores,
+    sentiments,
+    setSentiments,
+    anchorEls,
+    setAnchorEls,
+    openTooltip,
+    setOpenTooltip,
+    showPriceImpact,
+    cardWidths,
+    setCardWidths,
+    typedText,
+    setTypedText,
+    sentimentFilter,
+    setSentimentFilter,
+    importantTitles
+  } = useAppState();
+
   const cardRefs = useRef({});
   const priceImpactRefs = useRef({});
-  const [typedText, setTypedText] = useState({});
 
-  useEffect(() => {
-    if (!activeTab) {
-      setNews([]);
-      return;
-    }
-    setLoading(true);
-    getNews(activeTab)
-      .then(res => setNews(res.data))
-      .catch(() => setNews([]))
-      .finally(() => setLoading(false));
-  }, [activeTab]);
+  useAISummaries(news, activeTab, setAiScores, aiScores);
+  useAISentiments(news, activeTab, setSentiments, sentiments);
 
-  useSequentialFetch(news, activeTab, setAiScores);
-  useSequentialSentimentFetch(news, activeTab, setSentiments);
-  useTypewriterEffect(openTooltip, aiScores, anchorEls, setTypedText);
+  const { sentimentCounts, filteredNews } = useSentimentFilter(news, sentiments, sentimentFilter);
 
-  const handleClose = () => {
-    setOpenTooltip(null);
-    setAnchorEls({});
-  };
+  const handlers = useAppHandlers({
+    setOpenTooltip,
+    setAnchorEls,
+    setTypedText,
+    setCardWidths,
+    cardRefs,
+    priceImpactRefs
+  });
 
-  const handleMouseEnter = (key) => {
-    setOpenTooltip(key);
-  };
-
-  const handleMouseLeave = () => {
-    setOpenTooltip(null);
-  };
-
-  const handleClick = (key) => {
-    const cardWidth = cardRefs.current[key]?.offsetWidth;
-    if (cardWidth) {
-      setCardWidths(prev => ({ ...prev, [key]: cardWidth }));
-    }
-    setAnchorEls(prev => ({ ...prev, [key]: priceImpactRefs.current[key] }));
-    setOpenTooltip(key);
-  };
+  // News section collapse state
+  const [newsCollapsed, setNewsCollapsed] = useState(false);
 
   return (
     <>
@@ -70,32 +68,94 @@ function App() {
         setChips={setChips}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        style={{ position: 'fixed', width: '100%', zIndex: 2 }}
       />
 
-      {activeTab && (
-        <Box sx={{ width: '100%', mt: 2, px: 8 }}>
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-start' }}>
-            <span style={{ fontWeight: 600, fontSize: '1.2rem', color: '#90caf9' }}>News</span>
-          </Box>
-          <NewsGrid
-            news={news}
-            loading={loading}
-            aiScores={aiScores}
-            sentiments={sentiments}
-            showPriceImpact={showPriceImpact}
-            cardRefs={cardRefs}
-            priceImpactRefs={priceImpactRefs}
-            cardWidths={cardWidths}
-            openTooltip={openTooltip}
-            anchorEls={anchorEls}
-            onClose={handleClose}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            onClick={handleClick}
-            typedText={typedText}
-          />
-        </Box>
-      )}
+      <div style={{ display: 'flex', width: '100%', position: 'relative' }}>
+        {activeTab && (
+          <>
+            <div style={{ minWidth: 400, maxWidth: 440, marginRight: 0, position: 'fixed', left: 0 }}>
+              <CompanyDescriptionPanel ticker={activeTab} />
+            </div>
+            <div style={{
+              width: 1,
+              background: '#333',
+              margin: '0 32px',
+              borderRadius: 2,
+              height: '100vh',
+              minHeight: 400,
+              alignSelf: 'stretch',
+              position: 'fixed',
+              left: 440,
+              zIndex: 1
+            }} />
+          </>
+        )}
+        <div style={{ flex: 1, marginLeft: activeTab ? 500 : 0 }}>
+          {activeTab && (
+            <Box sx={{ width: '100%', mt: 2, px: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18, gap: 32, height: 48 }}>
+                <div style={{ display: 'flex', alignItems: 'center', height: 48 }}>
+                  <h2 style={{ margin: 0, fontWeight: 800, fontSize: 24, color: '#fff', letterSpacing: 0.5, lineHeight: 1.1, textAlign: 'left', display: 'flex', alignItems: 'center', height: 48 }}>
+                    News
+                    <button
+                      aria-label={newsCollapsed ? 'Expand news' : 'Collapse news'}
+                      onClick={() => setNewsCollapsed(v => !v)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 4,
+                        marginLeft: 6,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fff',
+                        transition: 'background 0.2s',
+                        padding: 0,
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.7 }}>{newsCollapsed ? '▶' : '▼'}</span>
+                    </button>
+                  </h2>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', height: 48, marginLeft: 0 }}>
+                  <SentimentFilterBar
+                    sentimentCounts={sentimentCounts}
+                    sentimentFilter={sentimentFilter}
+                    setSentimentFilter={setSentimentFilter}
+                  />
+                </div>
+              </div>
+              {!newsCollapsed && (
+                <>
+                  <NewsGrid
+                    news={filteredNews}
+                    loading={loading}
+                    aiScores={aiScores}
+                    sentiments={sentiments}
+                    showPriceImpact={showPriceImpact}
+                    cardRefs={cardRefs}
+                    priceImpactRefs={priceImpactRefs}
+                    cardWidths={cardWidths}
+                    openTooltip={openTooltip}
+                    anchorEls={anchorEls}
+                    onClose={handlers.handleClose}
+                    onMouseEnter={handlers.handleMouseEnter}
+                    onMouseLeave={handlers.handleMouseLeave}
+                    onClick={handlers.handleClick}
+                    typedText={typedText}
+                    importantTitles={importantTitles}
+                    normalize={normalize}
+                  />
+                </>
+              )}
+            </Box>
+          )}
+        </div>
+      </div>
     </>
   );
 }

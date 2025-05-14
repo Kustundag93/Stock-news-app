@@ -1,9 +1,19 @@
 import React from 'react';
-import { Box, Typography, Tooltip, Skeleton } from '@mui/material';
+import { Box, Tooltip, Skeleton } from '@mui/material';
+import SummarizeIcon from '@mui/icons-material/Summarize';
 
-const SummaryButton = React.forwardRef(({ loading, interpretation, onClick, isOpen }, ref) => {
+const getSentimentColor = (sentiment) => {
+  if (!sentiment) return 'grey.600';
+  const norm = sentiment.toLowerCase();
+  if (norm.startsWith('positive')) return 'success.main';
+  if (norm.startsWith('negative')) return 'error.main';
+  if (norm.startsWith('neutral')) return 'grey.600';
+  return 'grey.600';
+};
+
+const SummaryButton = React.forwardRef(({ loading, interpretation, onClick, isOpen, sx, sentiment }, ref) => {
   if (loading) {
-    return <Skeleton variant="rectangular" width={100} height={24} sx={{ borderRadius: 2, mr: '32px' }} />;
+    return <Skeleton variant="rectangular" width={100} height={24} sx={{ borderRadius: 2 }} />;
   }
 
   if (!interpretation) return null;
@@ -20,27 +30,16 @@ const SummaryButton = React.forwardRef(({ loading, interpretation, onClick, isOp
           borderRadius: 4,
           background: isOpen ? 'rgba(90,90,90,0.15)' : 'transparent',
           transition: 'background 0.2s, color 0.2s',
-          mr: '32px',
           '&:hover': {
             background: 'rgba(90,90,90,0.25)',
             color: 'primary.main',
             boxShadow: 2,
-          }
+          },
+          ...sx
         }}
         onClick={onClick}
       >
-        <Typography
-          variant="caption"
-          sx={{
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            letterSpacing: 0.2,
-            userSelect: 'none',
-            color: 'primary.main',
-          }}
-        >
-          Summary
-        </Typography>
+        <SummarizeIcon sx={{ fontSize: 16, mr: 0, color: getSentimentColor(sentiment) }} />
       </Box>
     </Tooltip>
   );

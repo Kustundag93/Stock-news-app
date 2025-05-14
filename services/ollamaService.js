@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const axios = require('axios');
 
 const OLLAMA_API_URL = 'http://localhost:11434/api/generate';
 
@@ -64,13 +65,64 @@ async function interpretNews(title, content, sentimentOnly = false) {
   if (sentimentOnly) {
     prompt = `Analyze the following news and state if the sentiment is positive, negative, or neutral. Respond only with one word: Positive, Negative, or Neutral.\n\nTitle: ${title}\nContent: ${content}`;
   } else {
-    prompt = `You are a financial news analyst. Analyze the following news and provide only a concise explanation of its potential impact on the stock price. Do not include any headings or labels, just the explanation itself.\n\nNews Content:\nTitle: ${title}\nContent: ${content}\n\nFocus on financial implications, market sentiment, and key factors. Respond with only the explanation.`;
+    prompt = `You are a financial news analyst. Analyze the following news article and provide a concise summary (2-3 sentences) of its potential impact on the stock price. In your summary, also indicate the sentiment by starting with either "POSITIVE:", "NEGATIVE:", or "NEUTRAL:" followed by your analysis.
+
+Title: ${title}
+Content: ${content}
+
+Respond in this exact JSON format, nothing else:
+{
+  "summary": "SENTIMENT: your concise summary here"
+}`;
   }
   
   return generateResponse(prompt, sentimentOnly);
 }
 
+async function askImportantNews(prompt) {
+  const response = await axios.post('http://localhost:11434/api/generate', {
+    model: 'mistral',
+    prompt,
+    stream: false,
+    options: { temperature: 0 }
+  });
+  console.log('Ollama yanıtı:', response.data);
+  const completion = response.data.completion || response.data.response || '';
+  return completion
+    ? completion.split('\n').map(line => line.trim()).filter(line => line)
+    : [];
+}
+
+/**
+ * Şirket için detaylı İngilizce açıklama oluşturur
+ * @param {string} companyNameOrTicker - Şirket adı veya ticker
+ * @returns {Promise<string>} - AI yanıtı
+ */
+async function describeCompany(companyNameOrTicker) {
+  const tickerMap = {
+    AAPL: 'Apple Inc.',
+    MSFT: 'Microsoft Corporation',
+    TSLA: 'Tesla Inc.',
+    AMZN: 'Amazon.com, Inc.',
+    GOOGL: 'Alphabet Inc.',
+    META: 'Meta Platforms, Inc.',
+    NVDA: 'NVIDIA Corporation',
+    NFLX: 'Netflix, Inc.',
+    BRK: 'Berkshire Hathaway Inc.',
+    JPM: 'JPMorgan Chase & Co.',
+    V: 'Visa Inc.',
+    DIS: 'The Walt Disney Company'
+    // Diğer popüler tickerlar eklenebilir
+  };
+  const name = tickerMap[companyNameOrTicker.toUpperCase()] || companyNameOrTicker;
+  const prompt = `You are a financial analyst. The following input is a US stock ticker or a company name. If it is a ticker, first determine which company it belongs to, then write a formal, well-structured, and informative English paragraph for an investor or finance professional who wants to understand this company.\n\nYour response must be a single, coherent paragraph (do not use bullet points or lists) that covers: what the company does and its main business areas, its market value, headquarters, CEO (if available), key products or services, any recent important developments or unique strengths, and its place in the industry and main competitors.\n\nWrite in a clear, professional, and objective tone. Respond only in English. Do not use bullet points or lists.\n\nInput: ${name}`;
+  const response = await generateResponse(prompt);
+  return { description: response, companyName: name };
+}
+
 module.exports = {
   interpretNews,
-  generateResponse
+  generateResponse,
+  askImportantNews,
+  describeCompany
 }; 

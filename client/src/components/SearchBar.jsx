@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Container, TextField, InputAdornment, IconButton, Stack, Chip } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import CloseIcon from '@mui/icons-material/Close';
 
 const VALID_TICKERS = ['AAPL', 'TSLA', 'NVDA', 'GOOGL', 'MSFT', 'META'];
 
@@ -93,7 +94,8 @@ function SearchBar({ input, setInput, chips, setChips, activeTab, setActiveTab }
                   variant={activeTab === ticker ? 'filled' : 'outlined'}
                   onClick={() => setActiveTab(ticker)}
                   onDelete={() => handleDelete(ticker)}
-                  sx={{ fontWeight: 600, fontSize: '1rem', mb: 1, cursor: 'pointer' }}
+                  deleteIcon={<CloseIcon sx={{ fontSize: 15, borderRadius: 0, p: 0, m: 0, transition: 'transform 0.15s', '&:hover': { transform: 'scale(1.1)' } }} />}
+                  sx={{ fontWeight: 600, fontSize: '1rem', mb: 1, cursor: 'pointer', borderRadius: 2 }}
                 />
               ))}
             </Stack>

@@ -1,10 +1,9 @@
 import React from 'react';
-import { Box, Grid, Stack, Typography } from '@mui/material';
+import { Box, Grid, Stack, Skeleton } from '@mui/material';
 import NewsCard from './NewsCard';
 
 function NewsGrid({
   news,
-  loading,
   aiScores,
   sentiments,
   showPriceImpact,
@@ -18,6 +17,8 @@ function NewsGrid({
   onMouseLeave,
   onClick,
   typedText,
+  importantTitles,
+  normalize,
 }) {
   // Kartları 4 sütuna böl
   const columns = [[], [], [], []];
@@ -25,18 +26,41 @@ function NewsGrid({
     columns[idx % 4].push(item);
   });
 
-  if (loading) {
-    return <Typography color="text.secondary">Loading news...</Typography>;
-  }
-
+  // Her sütunda gelen haber kadar kart göster
   return (
     <Grid container spacing={2}>
       {columns.map((col, colIdx) => (
         <Grid item xs={12} sm={6} md={3} key={colIdx}>
           <Stack spacing={2}>
-            {col.slice(0, 5).map((item, idx) => {
+            {col.map((item, idx) => {
               const rowIdx = idx;
               const key = `${item.title}_${colIdx}_${rowIdx}`;
+              
+              // Başlık eşleştirmesi için normalize edilmiş başlıkları karşılaştır
+              const normalizedItemTitle = normalize(item.title);
+              const importantIdx = importantTitles?.findIndex(title => {
+                const normalizedTitle = normalize(title);
+                const isMatch = normalizedTitle === normalizedItemTitle;
+                if (isMatch) {
+                  console.log('Başlık eşleşmesi bulundu:', {
+                    originalItemTitle: item.title,
+                    normalizedItemTitle,
+                    originalImportantTitle: title,
+                    normalizedImportantTitle: normalizedTitle,
+                    index: importantTitles.indexOf(title)
+                  });
+                }
+                return isMatch;
+              });
+              
+              if (importantIdx !== -1) {
+                console.log('Önemli haber bulundu:', {
+                  title: item.title,
+                  rank: importantIdx + 1,
+                  totalImportant: importantTitles?.length
+                });
+              }
+
               return (
                 <NewsCard
                   key={key}
@@ -56,6 +80,8 @@ function NewsGrid({
                   onMouseLeave={onMouseLeave}
                   onClick={() => onClick(key)}
                   typedText={typedText[key]}
+                  isImportant={importantIdx !== -1}
+                  importantRank={importantIdx !== -1 ? importantIdx + 1 : null}
                 />
               );
             })}
